@@ -20,6 +20,7 @@
       <button class="tab active" data-tab="request">예약 신청</button>
       <button class="tab" data-tab="board">전체 현황판</button>
       <button class="tab" data-tab="driver">기사님 오늘 일정</button>
+      <button class="tab" data-tab="calendar">월간 캘린더</button>
     </div>
   </div>
 
@@ -69,6 +70,19 @@
       <div class="driver-count" id="driverCount"></div>
       <div id="driverList"></div>
       <p class="footnote">매일 아침 이 화면만 확인하시면 됩니다. 별도 전화 안내 없이 신청 즉시 이 목록에 자동으로 반영됩니다.</p>
+    </section>
+
+    <!-- ============ TAB 4: 월간 캘린더 ============ -->
+    <section id="tab-calendar" class="hidden">
+      <h2 class="section-title">월간 캘린더</h2>
+      <p class="section-sub">예약이 있는 날짜에는 건수가 표시됩니다. 날짜를 누르면 아래에 그날 일정이 크게 표시됩니다.</p>
+      <div class="cal-nav">
+        <button id="calPrev">‹</button>
+        <div class="cal-label" id="calMonthLabel"></div>
+        <button id="calNext">›</button>
+      </div>
+      <div id="calGrid"></div>
+      <div id="calDayDetail" class="cal-day-detail"></div>
     </section>
   </main>
 </div>
