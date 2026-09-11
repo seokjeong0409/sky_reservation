@@ -43,6 +43,13 @@ async function addReservation(dateStr, item){
 async function removeReservation(dateStr, id){
   await db.ref('reservations/' + dateStr + '/' + id).remove();
 }
+async function getMonthReservations(year, month){
+  const mm = pad(month);
+  const start = `${year}-${mm}-01`;
+  const end = `${year}-${mm}-31`;
+  const snap = await db.ref('reservations').orderByKey().startAt(start).endAt(end).once('value');
+  return snap.val() || {};
+}
 
 // ---- 탭 전환 ----
 document.querySelectorAll('.tab').forEach(btn=>{
@@ -53,6 +60,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.getElementById('tab-'+btn.dataset.tab).classList.remove('hidden');
     if(btn.dataset.tab==='board') renderBoard();
     if(btn.dataset.tab==='driver') renderDriver();
+    if(btn.dataset.tab==='calendar') renderCalendarGrid();
   });
 });
 
@@ -197,6 +205,83 @@ function setDriverDay(offset){
   document.getElementById('btnToday').classList.toggle('active', offset===0);
   document.getElementById('btnTomorrow').classList.toggle('active', offset===1);
   renderDriver();
+}
+
+// ---- 월간 캘린더 ----
+let calYear = todayDate().getFullYear();
+let calMonth = todayDate().getMonth() + 1; // 1-12
+
+document.getElementById('calPrev').addEventListener('click', ()=>{
+  calMonth--; if(calMonth<1){calMonth=12; calYear--;}
+  document.getElementById('calDayDetail').innerHTML='';
+  renderCalendarGrid();
+});
+document.getElementById('calNext').addEventListener('click', ()=>{
+  calMonth++; if(calMonth>12){calMonth=1; calYear++;}
+  document.getElementById('calDayDetail').innerHTML='';
+  renderCalendarGrid();
+});
+
+function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+function firstWeekday(y,m){ return new Date(y, m-1, 1).getDay(); }
+
+async function renderCalendarGrid(){
+  document.getElementById('calMonthLabel').textContent = `${calYear}년 ${calMonth}월`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '<div class="empty-note">불러오는 중...</div>';
+  const monthData = await getMonthReservations(calYear, calMonth);
+  const numDays = daysInMonth(calYear, calMonth);
+  const startWeekday = firstWeekday(calYear, calMonth);
+  const todayStr = fmtDate(todayDate());
+
+  let cells = '';
+  for(let i=0;i<startWeekday;i++){ cells += `<div class="cal-cell empty"></div>`; }
+  for(let d=1; d<=numDays; d++){
+    const dateStr = `${calYear}-${pad(calMonth)}-${pad(d)}`;
+    const dayItems = monthData[dateStr] ? Object.values(monthData[dateStr]) : [];
+    const count = dayItems.length;
+    const isToday = dateStr === todayStr;
+    cells += `<div class="cal-cell ${isToday?'today':''} ${count>0?'has-res':''}" data-date="${dateStr}">
+      <div class="cal-daynum">${d}</div>
+      ${count>0 ? `<div class="cal-badge">${count}건</div>` : ''}
+    </div>`;
+  }
+
+  grid.innerHTML = `
+    <div class="cal-weekdays">${['일','월','화','수','목','금','토'].map(w=>`<div>${w}</div>`).join('')}</div>
+    <div class="cal-days">${cells}</div>
+  `;
+  grid.querySelectorAll('.cal-cell[data-date]').forEach(cell=>{
+    cell.addEventListener('click', ()=> selectCalendarDate(cell.dataset.date));
+  });
+}
+
+async function selectCalendarDate(dateStr){
+  document.querySelectorAll('.cal-cell').forEach(c=>c.classList.remove('selected'));
+  const cell = document.querySelector(`.cal-cell[data-date="${dateStr}"]`);
+  if(cell) cell.classList.add('selected');
+
+  const panel = document.getElementById('calDayDetail');
+  const d = new Date(dateStr+'T00:00:00');
+  const headerHtml = `<div class="preview-date-label">${dateStr} (${dowKR(d)}요일) 예약 목록</div>`;
+  panel.innerHTML = headerHtml + '<div class="empty-note">불러오는 중...</div>';
+
+  const items = await getReservations(dateStr);
+  items.sort((a,b)=>toMinutes(a.start)-toMinutes(b.start));
+
+  if(items.length===0){
+    panel.innerHTML = headerHtml + '<div class="empty-note">이 날짜에는 예약이 없습니다.</div>';
+    return;
+  }
+  // 기사님 화면과 동일한 큰 카드로 표시 (요청: 날짜 클릭 시 크게 보기)
+  panel.innerHTML = headerHtml + items.map(it=>`
+    <div class="driver-card">
+      <div class="driver-time">${it.start} - ${it.end}</div>
+      <div class="driver-loc">${escapeHtml(it.location)}</div>
+      <div class="driver-work">${escapeHtml(it.work)}</div>
+      <div class="driver-req">신청자: ${escapeHtml(it.name)} (${escapeHtml(it.dept)}) · 연락처 ${escapeHtml(it.phone)}</div>
+    </div>
+  `).join('');
 }
 
 async function renderDriver(){
